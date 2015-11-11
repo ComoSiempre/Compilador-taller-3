@@ -1,0 +1,783 @@
+package parser;
+
+/* Import the class java_cup.runtime.*  */
+import java_cup.runtime.*;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.FileReader;
+import java.util.ArrayList;
+import scanner.*;
+import ast.*;
+
+
+/* Codigo del parser, se copia integramente a la clase final.
+    Agregamos el manejo de errores. */
+parser code {:
+  public String cadenaGramatica = ""; /* ******************************variable de prueba, es para entender esto..... *********************************** */
+
+  public AstNodo root;
+  int globalInt=0;//contador de ints
+  int globalVoid=0;//contador de void.
+  int globalCompound=0;//contador de conpound.
+    
+  int fila;
+  int columna;
+
+  /* Reporte de error encontrado. */
+    //public void report_error(String message, Object info) {
+    //    StringBuilder m = new StringBuilder("Error");
+    //    if (info instanceof java_cup.runtime.Symbol) {
+    //        java_cup.runtime.Symbol s = ((java_cup.runtime.Symbol) info);
+    //        if (s.left >= 0) {                
+    //            m.append(" en linea "+(s.left+1));
+    //            if (s.right >= 0)
+    //                m.append(", columna "+(s.right+1));
+    //        }
+    //    }
+    //    m.append(" : "+message);
+    //    System.err.println(m);
+    //}
+   
+    /* Cuando se encuentra un error de donde el sistema no puede
+        recuperarse, se lanza un error fatal. Se despliega el mensaje
+        de error y se finaliza la ejecucion. */
+    public void report_fatal_error(String message, Object info) {
+        report_error(message, info);
+        System.exit(1);
+    }
+
+    public void syntax_error(Symbol s){
+        report_error("Error sintactico en Linea: " + (s.left + 1) + " Columna: "+ (s.right + 1) + ". Texto: \"" +
+        s.value + "\"\n", s);
+    }
+
+    public int getFila(){
+      return fila;
+    }
+    public int getColumna(){
+      return columna;
+    }
+:};
+
+/* ------------Declaracion de simbolos terminales y no terminales---------- */
+   
+/* Terminales (tokens obtenidos por el analizador lexico).  
+
+   Terminales que no tienen un valor son listados primero, los terminales que
+   tienen un valor como los enteros son listados en la segunda o demas lineas. */
+   terminal String		IF,INT,ELSE,RETURN,VOID,WHILE,DO,IGUAL,SUMA,MULT,RESTA,DIV,
+   					          MENOR,MENIGUAL,MAYOR,MAYIGUAL,IGUALIGUAL,DISTINTO,PUNTOCOMA,COMA,PARENTHLEFT,PARENTHRIGHT,
+  					          BRACKETLEFT,BRACKETRIGHT,BRACERLEFT,BRACERRIGHT;
+   terminal String 	NUM;//si se declara como integer causa errores, se decidio por dejarlo como string y convertir en los constructores.
+   terminal String  ID;
+   
+   /* No terminales usados en la seccion gramatical. 
+
+   Primero se lista los no terminales que tienen un valor Object y despues
+   se lista los no terminales que tienen un entero. Un Object se refiere a que
+   no tienen tipo, pudiendo ser entero o String. */
+
+   //non terminal AstNodo 	program;
+   //non terminal Nodo declaration_list,param_list,statement_list;
+   //non terminal Nodo declaration,params,param,statement;
+   //non terminal Nodo var_declaration,fun_declaration;
+   //non terminal String    type_specifier;
+   //non terminal Nodo 		compound_stmt,local_declarations;
+   //non terminal Object 		expression_stmt,selection_stmt,iteration_stmt;
+   //non terminal Object 		while_stmt,do_while_stmt,return_stmt,expression,var,simple_expression;
+   //non terminal Object 		relop,additive_expression,addop,term,mulop,factor,call,args,arg_list;
+   //non terminal           empty;
+
+   non terminal AstNodo   program;
+   non terminal AstNodo   declaration_list;
+   non terminal AstNodo      declaration;
+   non terminal String       type_specifier;
+   non terminal AstNodo      var_declaration;
+   non terminal AstNodo  param_list;
+   non terminal Object      params;
+   non terminal AstNodo      param;
+   non terminal AstNodo            statement;
+   non terminal AstNodo            fun_declaration;
+   non terminal AstNodo        compound_stmt;
+   non terminal ArrayList<AstNodo>      local_declarations;
+   non terminal ArrayList<AstNodo>       statement_list;
+   non terminal String relop, addop, mulop;
+   non terminal AstNodo var, expression;
+   non terminal AstNodo    expression_stmt;
+   non terminal Object factor;
+   non terminal AstNodo term, additive_expression, simple_expression;
+   non terminal AstNodo    selection_stmt;
+   non terminal AstNodo    iteration_stmt;
+   non terminal AstNodo    while_stmt,do_while_stmt,return_stmt;
+   non terminal AstNodo    call,args,arg_list;
+   
+   
+   non terminal           empty;	
+
+precedence left ELSE, MULT, DIV, SUMA, RESTA;
+start with program;
+/* ------------------- Seccion de la gramatica ------------------------ */
+program ::= declaration_list:dl
+            {:
+              //System.out.println("fin prog: "+dl.getDeclaraciones().size());
+              //Nodo prog = new Nodo("program",dl);
+              //System.out.println("cant declaraciones en ejercicio: "+prog.getDeclarations().get(0).getDeclarations().size());
+              RESULT=dl;
+              root=dl;//envio el nodo del programa a la raiz.
+            
+            :}
+            ;
+
+declaration_list  ::= declaration_list:list declaration:d
+                      {:
+                      //System.out.println("declaration list 1");
+                          /*   
+                          if(d != null) {
+                            list.getDeclarations().add(d); //se agrega como hijo.
+                          } else {
+                            list = new Nodo(); //nodo a crear
+                          }
+                          RESULT = null;//este sirve para dar termino a los enlaces de una rama para seguir con otra o terminar.
+                          */
+                          if(d != null) {
+                            ((AstProgram)list).getDeclaraciones().add(d); //se agrega como hijo.
+                          //System.out.println(list.getDeclarations().size());
+                          } else {
+                            //por logica , no deberia entrar aqui.
+                            list = new AstProgram(); //nodo a crear
+                          }
+                          RESULT=list;//nesesario para completar el arbol con el nodo raiz.
+                          //RESULT = null;//este sirve para dar termino a los enlaces de una rama para seguir con otra o terminar.
+                          
+
+                      :}
+                      |
+                      declaration:d
+                      {:
+                      //System.out.println("decla list 2");
+                        AstProgram list = new AstProgram();
+                        list.getDeclaraciones().add(d);
+                        RESULT = list;
+                        
+                        
+                      :}
+                      ;
+
+declaration   ::= var_declaration:v
+                  {:
+                    
+                    RESULT=v;
+                  //System.out.println("declaration 1");
+                  :}
+                  |
+                  fun_declaration:f
+                  {:
+                    RESULT=f;
+                    //RESULT=new Nodo("declaration",f);
+                  //System.out.println("declaration 2");
+                  :}
+                  ;
+
+var_declaration   ::= type_specifier:t ID:id PUNTOCOMA
+                      {:
+                        if(t.equalsIgnoreCase("int")){
+                          AstVarDec nodo = new AstVarDec("INT",id,globalInt);
+                          fila=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left+1;
+                          columna=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right+1;
+                          nodo.setFila(fila);
+                          nodo.setColumna(columna);
+                          //System.out.println("variable dec: "+fila+", "+columna);
+                          RESULT=nodo;
+                        
+                        }else{
+                          AstVarDec nodo = new AstVarDec("VOID",id,globalVoid);    
+                          fila=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left+1;
+                          columna=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right+1;
+                          nodo.setFila(fila);
+                          nodo.setColumna(columna);
+                          //System.out.println("variable dec: "+fila+", "+columna);
+                          RESULT=nodo;
+                        
+                        }
+                        
+                        //System.out.println("var declaration 1");
+                      :}
+                      |
+                      type_specifier:t ID:id BRACKETLEFT NUM:n BRACKETRIGHT PUNTOCOMA
+                      {:
+                        if(t.equalsIgnoreCase("int")){
+                          AstVarDec nodo=new AstVarDec("INT",id,globalInt,Integer.parseInt(n));
+                          fila=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-4)).left+1;
+                          columna=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-4)).right+1;
+                          nodo.setFila(fila);
+                          nodo.setColumna(columna);
+                          //System.out.println("variable dec: "+fila+", "+columna);
+                          RESULT=nodo;
+                        
+                        }else{
+                          AstVarDec nodo=new AstVarDec("VOID",id,globalVoid,Integer.parseInt(n));
+                          fila=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-4)).left+1;
+                          columna=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-4)).right+1;
+                          nodo.setFila(fila);
+                          nodo.setColumna(columna);
+                          //System.out.println("variable dec: "+fila+", "+columna);
+                          RESULT=nodo;
+                        
+                        }
+                        //RESULT=new Nodo("var_declaration2",t.toString(),id,n);
+                      //System.out.println("var declaration 2");
+                      :}
+                      ;
+
+/*no es nesesario la creacion de este nodo*/
+type_specifier  ::= INT:i
+                  {:
+                    globalInt++;
+                    RESULT=i;
+                  //System.out.println("type INT");
+                  :}
+                    |
+                    VOID:v
+                    {:
+                      globalVoid++;
+                      RESULT=v;
+                    //System.out.println("type VOID");
+                    :}
+                    ;
+
+fun_declaration   ::= type_specifier:t ID:id PARENTHLEFT params:p PARENTHRIGHT compound_stmt:com
+                      {:
+
+                        if(p instanceof Param){
+                          //quiere decir que hay parametro VOID
+                          AstFunction newNodo = new AstFunction(id, t);
+                          newNodo.getParametros().add((Param)p);
+                          if(com != null){
+                            newNodo.setContenido(com);
+                          }
+                          RESULT=newNodo;
+                        }else{
+                          //quiere decir que existen parametros (llegara como objeto).
+                          ((AstFunction) p).setID(id);
+                          ((AstFunction) p).setTipoIDFuncion(t);
+                          if(com != null){
+                            ((AstFunction) p).setContenido(com);
+                          }
+                          RESULT=(AstNodo) p;
+                        }
+
+
+                        //((AstFunction) p).setID(id);
+                        //((AstFunction) p).setTipoIDFuncion(t);
+                        //if(com!=null){
+                        //  ((AstFunction) p).getParametros().add(com);    
+                        //}
+                        //RESULT=(AstNodo) p;
+                      //System.out.println("fun_declaration");
+                        
+                      :}
+                      ;
+
+params  ::= param_list:pl
+            {:
+              RESULT=pl; //subiria como una nodoFunction.
+            //System.out.println("params 1");
+              //Nodo node = new Nodo("params",pl);
+            //System.out.println("cant parametros en funcion: "+node.getDeclarations().get(0).getDeclarations().size());
+              //RESULT=node;
+            :}
+            |
+            VOID:v
+            {:
+              Param nodo =new Param("VOID",true);
+              fila=((java_cup.runtime.Symbol)CUP$parser$stack.peek()).left+1;
+              columna=((java_cup.runtime.Symbol)CUP$parser$stack.peek()).right+1;
+              nodo.setFila(fila);
+              nodo.setColumna(columna);
+              RESULT=nodo;
+              //RESULT=new AstFunction(true);
+            //System.out.println("params 2");
+              //se debe crear un nodo que una a la funcion.
+              //Nodo voi=new Nodo("VOID");
+              //RESULT=voi;
+            :}
+            ;
+
+param_list  ::= param_list:list COMA param:p
+                {:
+                //System.out.println("param_list 1");
+                  if(p != null) {
+                    ((AstFunction) list).getParametros().add(p); //se agrega como hijo el parametro.
+                    //System.out.println(((AstFunction) list).getParametros().size());
+                  } else {
+                    //por logica , no deberia entrar aqui.
+                    System.out.println("no deberia entrar aqui");
+                    list = new AstFunction(); //nodo a crear
+                    }
+                    RESULT=list;
+                :}
+                |
+                param:p
+                {:
+                //System.out.println("param_list 2");
+                  AstFunction list= new AstFunction();
+                  fila=((java_cup.runtime.Symbol)CUP$parser$stack.peek()).left+1;
+                  columna=((java_cup.runtime.Symbol)CUP$parser$stack.peek()).right+1;
+                  list.setFila(fila);
+                  list.setColumna(columna);
+                  list.getParametros().add(p);
+                  RESULT=list;
+                :}
+                ;
+
+//gramatica donde se creara nodo tipo parametro la cual sera "hoja"
+param   ::= type_specifier:t ID:id
+            {:
+              Param nodo=new Param(id,t,false);
+              fila=((java_cup.runtime.Symbol)CUP$parser$stack.peek()).left+1;
+              columna=((java_cup.runtime.Symbol)CUP$parser$stack.peek()).right+1;
+              nodo.setFila(fila);
+              nodo.setColumna(columna);
+              RESULT=nodo;
+              //System.out.println("Param 1");
+              //RESULT=new Nodo("param",t.toString(),id);
+            :}
+            |
+            type_specifier:t ID:id BRACKETLEFT BRACKETRIGHT
+            {:
+              Param nodo=new Param(id,t,true); 
+              fila=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-2)).left+1;
+              columna=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-2)).right+1;
+              nodo.setFila(fila);
+              nodo.setColumna(columna);
+              RESULT=nodo;
+              
+            //System.out.println("Param 2");
+            :}
+            ;
+
+compound_stmt   ::= BRACERLEFT local_declarations:ld statement_list:sl BRACERRIGHT
+                    {:
+
+                      if(ld.size()==0 && sl.size()==0){
+                        //no hay declaraciones ni expresiones de ningun tipo.
+                        RESULT=null;
+                      }else{
+
+                        RESULT=new Compound(ld, sl); 
+                      }
+                      //if(ld.size()==0){
+                      //  RESULT=null;
+                      //}else{
+                      //  RESULT=new Compound(ld,sl,globalCompound+1);
+                      //  globalCompound++;
+                      //}
+                       //RESULT=new Compound(ld,sl);   
+                      //System.out.println("compound_stmt");
+                      //RESULT=new Nodo("compound_stmt",ld,sl);
+                    :}
+                    ;
+
+local_declarations  ::= local_declarations:list var_declaration:l //lista de declaraciones locales, local declaration seria de tipo ArrayList
+                        {:
+                          //System.out.println("local_declarations 1");
+                          if(l != null) {
+                            list.add(l); //se agrega como hijo.
+                            //System.out.println(list.getDeclarations().size());
+                          } else {
+                            //no deberia entrar...
+                            list = new ArrayList<AstNodo>();
+                          }
+                          RESULT=list;
+                        :}
+                        |
+                        empty
+                        {:
+                          
+                          ArrayList<AstNodo> list= new ArrayList<AstNodo>();
+                          RESULT=list;
+                          //System.out.println("empty");
+                          //Nodo vacio=new Nodo("empty");
+                          //RESULT= vacio;
+                        :}
+                        ;
+
+statement_list  ::= statement_list:list statement:s //lista de declaraciones generales.
+                    {:
+                      //System.out.println("19");
+                      if(s != null) {
+                          list.add(s); //se agrega como hijo.
+                          //System.out.println(list.getDeclarations().size());
+                          } else {
+                          //no deberia entrar...
+                          list = new ArrayList<AstNodo>();
+                          }
+                          RESULT=list;
+                    :}
+                    |
+                    empty
+                    {:
+                      //System.out.println("vacio");
+                      ArrayList<AstNodo> list= new ArrayList<AstNodo>();
+                      RESULT=list;
+                    :}
+                    ;
+
+statement   ::= expression_stmt:ex
+                {:
+                  RESULT=ex;
+                  //System.out.println("20");
+                :}
+                |
+                compound_stmt:cs
+                {:
+                  RESULT=cs;
+                  //System.out.println("21");
+                :}
+                |
+                selection_stmt:ss
+                {:
+                  RESULT=ss;
+                  //System.out.println("22");
+                :}
+                |
+                iteration_stmt:is
+                {:
+                  RESULT=is;
+                  //System.out.println("23");
+                :}
+                |
+                return_stmt:rs
+                {:
+                  RESULT=rs;
+                  //System.out.println("24");
+                :}
+                ;
+
+expression_stmt   ::= expression:e PUNTOCOMA
+                      {:
+                        //System.out.println("25");
+                        RESULT=e;
+                      :}
+                      |
+                      PUNTOCOMA
+                      {:
+                        //System.out.println("26");
+                        
+                      :}
+                      ;
+
+selection_stmt  ::= IF PARENTHLEFT expression:ex PARENTHRIGHT statement:sta ELSE statement:sta2
+                    {:
+                      //System.out.println("27");
+                      RESULT= new Statement("IF",ex, sta, sta2);
+
+                    :} 
+                    |
+                    IF PARENTHLEFT expression:ex PARENTHRIGHT statement:sta
+                    {:
+                      //System.out.println("28");
+                      RESULT=new Statement("IF", ex, sta);
+                    :} 
+                    ;
+
+iteration_stmt  ::= while_stmt:ws
+                    {:
+                      //System.out.println("29");
+                      RESULT=ws;
+                    :}
+                    |
+                    do_while_stmt:dws
+                    {:
+                      //System.out.println("30");
+                      RESULT=dws;
+
+                    :}
+                    ;
+
+while_stmt  ::= WHILE PARENTHLEFT expression:ex PARENTHRIGHT statement:sta
+                {:
+                  //System.out.println("31");
+                  RESULT=new Statement("WHILE", ex, sta);
+                :}
+                ;
+
+do_while_stmt   ::= DO statement:sta WHILE PARENTHLEFT expression:ex PARENTHRIGHT
+                    {:
+                      //System.out.println("32");
+                      RESULT=new Statement("DO", ex, sta);
+                    :}
+                    ;
+
+return_stmt   ::= RETURN PUNTOCOMA
+                  {:
+                    //System.out.println("33");
+                    Statement nodo =new Statement("RETURN");
+                    nodo.setTipoFuncion("VOID");
+                    RESULT=nodo;
+                  :}
+                  |
+                  RETURN expression:ex PUNTOCOMA
+                  {:
+                    //System.out.println("34");
+                    Statement nodo =new Statement("RETURN", ex);
+                    nodo.setTipoFuncion("INT");
+                    RESULT=nodo;
+                  :}
+                  ;
+                  
+expression  ::= var:v IGUAL:i expression:ex
+                {:
+                  //System.out.println("35");
+                  Expression nodo = new Expression(v, i, ex);
+                  fila=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left+1;
+                  columna=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right+1;
+                  nodo.setFila(fila);
+                  nodo.setColumna(columna);
+                  RESULT=nodo;
+                :}
+                |
+                simple_expression:s
+                {:
+                  RESULT=s;
+                  //System.out.println("36");
+                :}
+
+                ;
+
+var   ::= ID:id
+          {:
+            Var nodo=new Var(id, true);
+            fila=((java_cup.runtime.Symbol)CUP$parser$stack.peek()).left+1;
+            columna=((java_cup.runtime.Symbol)CUP$parser$stack.peek()).right+1;
+            nodo.setFila(fila);
+            nodo.setColumna(columna);
+            RESULT=nodo;
+            //System.out.println("37");
+          :}
+          |
+          ID:id BRACKETLEFT expression:ex BRACKETRIGHT
+          {:
+            Var nodo=new Var(id, ex);
+            fila=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-3)).left+1;
+            columna=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-3)).right+1;
+            nodo.setFila(fila);
+            nodo.setColumna(columna);
+            RESULT=nodo;
+            //System.out.println("38");
+          :}
+          ;
+
+simple_expression   ::= additive_expression:a relop:r additive_expression:ae
+                        {:
+                          //System.out.println("39");
+                          Expression nodo=new Expression(a, r, ae);
+                          fila=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left+1;
+                          columna=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right+1;
+                          nodo.setFila(fila);
+                          nodo.setColumna(columna);
+                          RESULT=nodo;
+
+                        :}
+                        |
+                        additive_expression:ae
+                        {:
+                          //System.out.println("40");
+                          RESULT=ae;
+                        :}
+                        ;
+
+relop   ::= MENIGUAL:m
+            {:
+              RESULT=m;
+             //System.out.println("41");
+            :}
+            |
+            MENOR:me
+            {:
+              RESULT=me;
+              //System.out.println("42");
+            :}
+            |
+            MAYOR:ma
+            {:
+              RESULT=ma;
+              //System.out.println("43");
+            :}
+            |
+            MAYIGUAL:may
+            {:
+              RESULT=may;
+              //System.out.println("44");
+            :}
+            |
+            IGUALIGUAL:ig
+            {:
+              RESULT=ig;
+              //System.out.println("45");
+            :}
+            |
+            DISTINTO:di
+            {:
+              RESULT=di;
+              //System.out.println("46");
+            :}
+            ;
+
+additive_expression   ::= additive_expression:ae addop:ad term:t
+                          {:
+                            //System.out.println("47");
+                            Expression nodo=new Expression(ae, ad, t);
+                            fila=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left+1;
+                            columna=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right+1;
+                            nodo.setFila(fila);
+                            nodo.setColumna(columna);
+                            RESULT=nodo;
+                          :}
+                          |
+                          term:t
+                          {:
+                            RESULT=t;
+                            //System.out.println("48");
+                          :}
+                          ;
+
+addop   ::= SUMA:s
+            {:
+              RESULT=s;
+              //System.out.println("49");
+            :}
+            |
+            RESTA:r
+            {:
+              RESULT=r;
+              //System.out.println("50");
+            :}
+            ;
+
+term  ::= term:t mulop:m factor:f
+          {:
+            if(f instanceof String){
+              Expression nodo=new Expression(t, m, f.toString());//f es numero.
+              fila=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left+1;
+              columna=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right+1;
+              nodo.setFila(fila);
+              nodo.setColumna(columna);
+              RESULT=nodo;
+            }else{
+              Expression nodo = new Expression(t, m, (AstNodo)f);
+              fila=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left+1;
+              columna=((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right+1;
+              nodo.setFila(fila);
+              nodo.setColumna(columna);
+              RESULT=nodo;
+            }
+            //System.out.println("51");
+          :}
+          |
+          factor:f
+          {:
+            if(f instanceof String){
+              //corresponde a un numero.
+              RESULT= new Var((String)f, false); //se utiliaza el nodo var para ahorrar en hacer una clase factor.
+
+            }else{
+              //corresponde a un nodo.
+              RESULT=(AstNodo)f;
+            }
+            
+            //System.out.println("52");
+          :}
+          ;
+
+mulop   ::= MULT:m
+            {:
+              RESULT=m;
+//            //System.out.println("53");
+            :}
+            |
+            DIV:d
+            {:
+              RESULT=d;
+  //          //System.out.println("54");
+            :}
+            ;
+
+factor  ::= PARENTHLEFT expression:ex PARENTHRIGHT
+            {:
+              RESULT=ex;
+    //        //System.out.println("55");
+            :}
+            |
+            var:v
+            {:
+              RESULT=v;
+      //      //System.out.println("56");
+            :}
+            |
+            call:c
+            {:
+        //    //System.out.println("57");
+              RESULT=c;
+            :}
+            |
+            NUM:n
+            {:
+              RESULT=n;
+              //System.out.println("58");
+            :}
+            ;
+
+call  ::= ID:id PARENTHLEFT args:args PARENTHRIGHT
+          {:
+            //System.out.println("59");
+              //guardo la fila y columna, para posibles errores.
+              fila=((java_cup.runtime.Symbol)CUP$parser$stack.peek()).left+1;
+              columna=((java_cup.runtime.Symbol)CUP$parser$stack.peek()).right+1;
+              ((Call)args).setFila(fila);
+              ((Call)args).setColumna(columna);
+              ((Call)args).setID(id);
+              RESULT=args;
+            
+          :}
+          ;
+
+args  ::= arg_list:al
+          {:
+            RESULT=al;
+            //System.out.println("60");
+          :}
+          |
+          empty
+          {:
+            //System.out.println("61");
+            RESULT=new Call();
+          :}
+          ;         
+
+arg_list  ::= arg_list:list COMA expression:ex
+              {:
+                //System.out.println("62");
+                if(ex != null) {
+                  ((Call)list).getArgs().add(ex); //se agrega como hijo.
+                  //System.out.println(list.getDeclarations().size());
+                } else {
+                  //por logica , no deberia entrar aqui.
+                  list = new Call(); //nodo a crear
+                }
+                RESULT=list;
+
+              :}
+              |
+              expression:ex
+              {:
+                //System.out.println("63");
+                Call list = new Call();
+                list.getArgs().add(ex);//que puede ser, Call.
+                RESULT = list;
+
+              :}
+              ;
+
+empty   ::= /* vacio */;              
+

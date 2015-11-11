@@ -1,0 +1,21 @@
+int z;
+int w;
+int suma;
+int sum(int a){
+  w=a;
+  
+  while(a = 2000){
+    a=a+1;
+  }
+  
+  return a;
+}
+
+void main( void ){
+  z=1000;
+  
+  suma = sum(z);
+  z = suma;
+  //terminado.
+
+}

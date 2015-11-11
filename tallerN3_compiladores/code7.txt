@@ -1,0 +1,23 @@
+int x;
+
+void f( void ){
+	x=2;
+	return;	
+}
+
+int f( void ){
+	return x;
+}
+
+int f(int x, int y){
+	
+	return;
+}
+
+int f(int x){
+	return x;
+}
+
+int main( void ){
+	return 0;
+}

@@ -1,0 +1,9 @@
+int a[5]; 
+void n; 
+void main( void ) 
+{ 
+	int inter;
+	inter = n/2;
+	
+ 
+} 
